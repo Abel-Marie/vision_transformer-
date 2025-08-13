@@ -35,3 +35,36 @@ class TransformerEncoder(nn.Module):
         mlp_output = self.mlp(self.norm2(x))
         x = x + mlp_output
         return x
+    
+class VisionTransformer(nn.Module):
+    def __init__(self, img_size, patch_size, in_channels, embed_dim, num_heads, mlp_dim, num_layers, num_classes, dropout):
+        super().__init__()
+        self.patch_embedding = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
+        num_patches = self.patch_embedding.num_patches
+
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
+        self.pos_embed = nn.Parameter(torch.randn(1, num_patches + 1, embed_dim))
+        self.pos_drop = nn.Dropout(dropout)
+
+        self.transformer_layers = nn.ModuleList([
+            TransformerEncoder(embed_dim, num_heads, mlp_dim, dropout)
+            for _ in range(num_layers)
+        ])
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.head = nn.Linear(embed_dim, num_classes)
+
+    def forward(self, x):
+        B = x.shape[0]
+        x = self.patch_embedding(x)
+        cls_tokens = self.cls_token.expand(B, -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+        x = x + self.pos_embed
+        x = self.pos_drop(x)
+        
+        for layer in self.transformer_layers:
+            x = layer(x)
+
+        cls_output = self.norm(x[:, 0])
+        output = self.head(cls_output)
+        return output
