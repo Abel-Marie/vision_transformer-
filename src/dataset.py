@@ -24,3 +24,5 @@ def get_data_loaders(batch_size):
     )
     
     return train_loader, val_loader
+
+
